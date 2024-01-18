@@ -1,1 +1,69 @@
+import unittest
+from unittest.mock import AsyncMock, patch
+from main import ChatTransport, ChatTransportDiscord, ChatTransportTelegram, SimpleBusinessLogicBot
 
+class TestChatTransport(unittest.IsolatedAsyncioTestCase):
+    async def test_send_message(self):
+        transport = ChatTransport()
+        with self.assertRaises(NotImplementedError):
+            await transport.send_message('Test Message')
+
+    async def test_run(self):
+        transport = ChatTransport()
+        with self.assertRaises(NotImplementedError):
+            await transport.run()
+
+class TestChatTransportDiscord(unittest.IsolatedAsyncioTestCase):
+    async def test_send_message(self):
+        bot = AsyncMock()
+        transport = ChatTransportDiscord(bot_token='TOKEN')
+        transport.bot = bot
+
+        await transport.send_message('Test Message')
+        bot.send.assert_called_once_with('Test Message')
+
+    async def test_run(self):
+        bot = AsyncMock()
+        transport = ChatTransportDiscord(bot_token='TOKEN')
+        transport.bot = bot
+
+        with patch.object(transport.bot, 'start') as mock_start:
+            await transport.run()
+            mock_start.assert_called_once_with('TOKEN')
+
+class TestChatTransportTelegram(unittest.IsolatedAsyncioTestCase):
+    async def test_send_message(self):
+        updater = AsyncMock()
+        transport = ChatTransportTelegram(bot_token='TOKEN')
+        transport.updater = updater
+
+        await transport.send_message('Test Message')
+        updater.dispatcher.bot.send_message.assert_called_once_with(chat_id=None, text='Test Message')
+
+    async def test_run(self):
+        updater = AsyncMock()
+        transport = ChatTransportTelegram(bot_token='TOKEN')
+        transport.updater = updater
+
+        with patch.object(transport.updater, 'start_polling') as mock_start:
+            await transport.run()
+            mock_start.assert_called_once()
+
+class TestSimpleBusinessLogicBot(unittest.IsolatedAsyncioTestCase):
+    async def test_handle_message(self):
+        transport = ChatTransport()
+        bot = SimpleBusinessLogicBot(transport)
+
+        received_messages = []
+
+        async def mock_send_message(msg):
+            received_messages.append(msg)
+
+        transport.send_message = mock_send_message
+
+        await bot.handle_message('Test Message')
+
+        self.assertEqual(received_messages, ['Hi! Your message was received: Test Message'])
+
+if __name__ == '__main__':
+    unittest.main()
